@@ -221,6 +221,8 @@ class Kintone:
             if len(params['records']) == 100:
                 resp = requests.post(url, json=params, headers=headers).json()
             for key, value in record.items():
+                if key not in parameter:
+                    continue
                 if parameter[key]['type'] in ('USER_SELECT', 'ORGANIZATION_SELECT', 'GROUP_SELECT'):
                     codes = []
                     for val in value:
@@ -282,6 +284,8 @@ class Kintone:
         parameter = self.property
 
         for key, value in record.items():
+            if key not in parameter:
+                continue
             if parameter[key]['type'] in ('USER_SELECT', 'ORGANIZATION_SELECT', 'GROUP_SELECT'):
                 codes = []
                 for val in value:

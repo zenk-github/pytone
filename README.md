@@ -1,1 +1,1 @@
-# pytoneでKintoneを操作したい 
+# pythonでKintoneを操作したい 
