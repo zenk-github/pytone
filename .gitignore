@@ -1,4 +1,5 @@
 test.py
+setup.py
 pytone/__pycache__/
 build/
 dist/
