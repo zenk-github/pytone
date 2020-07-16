@@ -5,8 +5,7 @@ pytoneは[Kintone](https://kintone.cybozu.co.jp/index.html)にアクセスする
 ```python
 from pytone import kintone
 
-kintone = kintone.Kintone(
-    'ユーザ名', 'パスワード', 'サブドメイン', 'アプリID')
+kintone = kintone.Kintone('APIトークン', 'サブドメイン', 'アプリID')
 ```
 # Features
 
@@ -34,19 +33,24 @@ pip install pytone
 * レコードの取得（一括）
 ```python
 #呼び出し方
-kintone.select(query,fields)
+kintone.select(query=query,order=order,limti=limit,fields=fields)
 """
 引数は省略可能です
 
 ・queryを省略した場合、アプリの全レコードを取得します
+・レコードのソートをする場合はqueryには書かず、orderに記述してください
+・limitを指定する場合はqueryには書かず、limitに数値を記述してください
 ・fieldsを省略した場合、全フィールドを取得します
 ・idとrevisionは指定していなくても取得します
+・対象のレコードをすべて取得します。（offset上限対応）
 """
 
 #例
-query    = 'フィールドコート１ = "value" limit 500'
+query    = 'フィールドコート１ = "value"'
+order    = 'order by $id asc'
+limit    = 500
 fields   = ['フィールドコート１','フィールドコート２','サブテーブル']
-response = kintone.select(query,fields)
+response = kintone.select(query=query,order=order,limit=limit,fields=fields)
 
 """
 レスポンスの例
