@@ -1,63 +1,80 @@
-import base64
 import json
 import sys
 import requests
 
 class Kintone:
 
-    def __init__(self,user,password,domain,app):
-        self.user     = user
-        self.password = password
+    def __init__(self,apiToken,domain,app):
+        self.apiToken = apiToken
         self.rootURL  = 'https://{}.cybozu.com/k/v1/'.format(domain)
         self.app      = app
-        self.authText = '{}:{}'.format(user, password)
-        self.authorization = base64.b64encode(self.authText.encode())
         self.data_type = ['__ID__', '__REVISION__',
                           'SINGLE_LINE_TEXT', 'CHECK_BOX', 'LINK', 'RICH_TEXT',
                           'RADIO_BUTTON', 'DROP_DOWN', 'MULTI_SELECT', 'MULTI_LINE_TEXT','FILE']
+        self.headers   = {
+            'X-Cybozu-API-Token': self.apiToken,
+            'Content-Type': 'application/json'
+        }
         self.property  = self.get_property()
 
     def get_property(self):
-        headers = {
-            'X-Cybozu-Authorization': self.authorization,
-            'Content-Type': 'application/json'
-        }
         params = {
             'app': self.app,
             'lang': 'default'
         }
         url = self.rootURL + 'app/form/fields.json'
 
-        resp = requests.get(url, json=params, headers=headers)
+        resp = requests.get(url, json=params, headers=self.headers)
         result = json.loads(resp.content.decode('utf-8'))
         return result['properties']
 
-    def select(self,query,fields=None):
-        headers = {
-            'X-Cybozu-Authorization': self.authorization,
-            'Content-Type': 'application/json'
-        }
+    def select(self,query=None,order=None,limit=None,fields=None):
+        #フィールドを指定しない場合はすべてのフィールドを取得
+        #クエリを指定しない場合、すべてのレコードを取得
+        #idとrevisionは常に取得する
         params = {
             'app'       : self.app,
-            'query'     : query,
             'totalCount': True
         }
-        #フィールドを指定しない場合はすべてのフィールドを取得
-        #idとrevisionは常に取得する
+        lastRecID = 0
+        responses = {
+            'records':[]
+        }
         if fields is not None:
             params['fields'] = list(set(fields + ['$id', '$revision']))
 
         url = self.rootURL + 'records.json'
         try:
-            resp = requests.get(url, json=params, headers=headers)
-            resp.raise_for_status()
+            while True:
+                if query is None:
+                    if order is None:
+                        params['query'] = '($id > {}) '.format(str(lastRecID)) + 'order by $id asc'
+                    else:
+                        params['query'] = '($id > {}) '.format(str(lastRecID)) + order
+                else:
+                    if order is None:
+                        params['query'] = '($id > {}) and ('.format(str(lastRecID)) + query + ') order by $id asc'
+                    else:
+                        params['query'] = '($id > {}) and ('.format(str(lastRecID)) + query + ') ' + order
+                if limit is not None:
+                    params['query'] = params['query'] + ' limit ' + str(limit)
+                resp = requests.get(url, json=params, headers=self.headers)
+                print(params['query'])
+                resp.raise_for_status()
+                response = json.loads(resp.content.decode('utf-8'))
+                if response['totalCount'] == '0':
+                    break
+                #レコードIDの最大値を取得
+                response_sorted = sorted(response['records'], key=lambda x:x['$id']['value'])
+                lastRecID = int(response_sorted[len(response_sorted) -1]['$id']['value'])
+                responses['records'] += response['records']
         except requests.exceptions.RequestException:
             message = ('error： ', json.loads(resp.content.decode('utf-8')))
             return message
 
         try:
             result = []
-            tmp    = json.loads(resp.content.decode('utf-8'))
+            tmp    = responses
             for record in tmp['records']:
                 tmp_dic = {}
                 for key,value in record.items():
@@ -119,10 +136,6 @@ class Kintone:
             return []
 
     def selectRec(self,recordID):
-        headers = {
-            'X-Cybozu-Authorization': self.authorization,
-            'Content-Type': 'application/json'
-        }
         params = {
             'app': self.app,
             'id' : recordID
@@ -130,7 +143,7 @@ class Kintone:
         url = self.rootURL + 'record.json'
 
         try:
-            resp = requests.get(url, json=params, headers=headers)
+            resp = requests.get(url, json=params, headers=self.headers)
             resp.raise_for_status()
         except requests.exceptions.RequestException:
             message = ('error： ', json.loads(resp.content.decode('utf-8')))
@@ -202,10 +215,6 @@ class Kintone:
         if type(records) != list:
             print('引数にはリスト型を指定してください')
             sys.exit()
-        headers = {
-            'X-Cybozu-Authorization': self.authorization,
-            'Content-Type': 'application/json'
-        }
         params = {
             'app': self.app,
             "records": [
@@ -219,7 +228,7 @@ class Kintone:
         for record in records:
             #100件づつkintoneに登録する
             if len(params['records']) == 100:
-                resp = requests.post(url, json=params, headers=headers).json()
+                resp = requests.post(url, json=params, headers=self.headers).json()
             for key, value in record.items():
                 if key not in parameter:
                     continue
@@ -262,7 +271,7 @@ class Kintone:
             tmp_param = {}
         #最後に残りを追加する
         if params['records']:
-            resp = requests.post(url, json=params, headers=headers).json()
+            resp = requests.post(url, json=params, headers=self.headers).json()
 
         return resp
     def insertRec(self,record:dict):
@@ -270,10 +279,6 @@ class Kintone:
         if type(record) != dict:
             print('引数には辞書型を指定してください')
             sys.exit()
-        headers = {
-            'X-Cybozu-Authorization': self.authorization,
-            'Content-Type': 'application/json'
-        }
         params = {
             'app': self.app,
             "record": {
@@ -321,7 +326,7 @@ class Kintone:
                     'value': value
                 }
                 continue
-        resp = requests.post(url, json=params, headers=headers).json()
+        resp = requests.post(url, json=params, headers=self.headers).json()
 
         return resp
 
@@ -329,10 +334,6 @@ class Kintone:
         if type(records) != list:
             print('引数にはリスト型を指定してください')
             sys.exit()
-        headers = {
-            'X-Cybozu-Authorization': self.authorization,
-            'Content-Type': 'application/json'
-        }
         params = {
             'app': self.app,
             "records": [
@@ -346,7 +347,7 @@ class Kintone:
         for record in records:
             #100件づつkintoneに登録する
             if len(params['records']) == 100:
-                resp = requests.put(url, json=params, headers=headers).json()
+                resp = requests.put(url, json=params, headers=self.headers).json()
             tmp_param['record'] = {}
             for key, value in record.items():
                 #レコードIDを取得する
@@ -408,7 +409,7 @@ class Kintone:
             tmp_param = {}
         #最後に残りを追加する
         if params['records']:
-            resp = requests.put(url, json=params, headers=headers).json()
+            resp = requests.put(url, json=params, headers=self.headers).json()
 
         return resp
 
@@ -416,10 +417,6 @@ class Kintone:
         if type(record) != dict:
             print('引数には辞書型を指定してください')
             sys.exit()
-        headers = {
-            'X-Cybozu-Authorization': self.authorization,
-            'Content-Type': 'application/json'
-        }
         params = {
             'app': self.app,
             "record": {
@@ -485,7 +482,7 @@ class Kintone:
                         'value': value
                     }
                     continue
-        resp = requests.put(url, json=params, headers=headers).json()
+        resp = requests.put(url, json=params, headers=self.headers).json()
 
         return resp
 
@@ -494,10 +491,6 @@ class Kintone:
             print('引数にはリスト型を指定してください')
             sys.exit()
 
-        headers = {
-            'X-Cybozu-Authorization': self.authorization,
-            'Content-Type': 'application/json'
-        }
         params = {
             'app': self.app,
             'ids': [
@@ -510,7 +503,7 @@ class Kintone:
             params['revisions'] = revisions
         params['ids'] = ids
 
-        resp = requests.delete(url, json=params, headers=headers).json()
+        resp = requests.delete(url, json=params, headers=self.headers).json()
 
         return resp
 
