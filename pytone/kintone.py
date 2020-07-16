@@ -59,7 +59,6 @@ class Kintone:
                 if limit is not None:
                     params['query'] = params['query'] + ' limit ' + str(limit)
                 resp = requests.get(url, json=params, headers=self.headers)
-                print(params['query'])
                 resp.raise_for_status()
                 response = json.loads(resp.content.decode('utf-8'))
                 if response['totalCount'] == '0':
