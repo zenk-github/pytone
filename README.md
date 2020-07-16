@@ -26,7 +26,7 @@ pytoneはPython3系で動作し、以下のライブラリに依存します。
 
 ```bash
 pip install requests
-pip install pytone
+pip install zenkPytone
 ```
 # Usage
 

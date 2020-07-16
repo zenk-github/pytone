@@ -1,2 +1,5 @@
 test.py
 pytone/__pycache__/
+build/
+dist/
+pytone.egg-info/

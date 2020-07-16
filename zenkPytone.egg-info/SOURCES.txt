@@ -1,0 +1,9 @@
+README.md
+setup.py
+pytone/__init__.py
+pytone/kintone.py
+zenkPytone.egg-info/PKG-INFO
+zenkPytone.egg-info/SOURCES.txt
+zenkPytone.egg-info/dependency_links.txt
+zenkPytone.egg-info/requires.txt
+zenkPytone.egg-info/top_level.txt
