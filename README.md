@@ -28,6 +28,7 @@ pytoneはPython3系で動作し、以下のライブラリに依存します。
 pip install requests
 pip install zenkPytone
 ```
+[![Downloads](https://pepy.tech/badge/zenkpytone)](https://pepy.tech/project/zenkpytone)
 # Usage
 
 * レコードの取得（一括）
