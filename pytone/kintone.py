@@ -28,9 +28,9 @@ class Kintone:
         result = json.loads(resp.content.decode('utf-8'))
         return result['properties']
 
-    def select(self,query=None,order=None,limit=None,fields=None):
+    def select(self,where=None,order=None,limit=None,fields=None):
         #フィールドを指定しない場合はすべてのフィールドを取得
-        #クエリを指定しない場合、すべてのレコードを取得
+        #whereを指定しない場合、すべてのレコードを取得
         #idとrevisionは常に取得する
         params = {
             'app'       : self.app,
@@ -46,16 +46,16 @@ class Kintone:
         url = self.rootURL + 'records.json'
         try:
             while True:
-                if query is None:
+                if where is None:
                     if order is None:
                         params['query'] = '($id > {}) '.format(str(lastRecID)) + 'order by $id asc'
                     else:
                         params['query'] = '($id > {}) '.format(str(lastRecID)) + order
                 else:
                     if order is None:
-                        params['query'] = '($id > {}) and ('.format(str(lastRecID)) + query + ') order by $id asc'
+                        params['query'] = '($id > {}) and ('.format(str(lastRecID)) + where + ') order by $id asc'
                     else:
-                        params['query'] = '($id > {}) and ('.format(str(lastRecID)) + query + ') ' + order
+                        params['query'] = '($id > {}) and ('.format(str(lastRecID)) + where + ') ' + order
                 if limit is not None:
                     params['query'] = params['query'] + ' limit ' + str(limit)
                 resp = requests.get(url, json=params, headers=self.headers)
@@ -79,18 +79,24 @@ class Kintone:
                 for key,value in record.items():
                     if value['type'] in self.data_type:
                         tmp_dic[key] = value['value']
-                    #intかfloat型にキャストする
+                    #intかfloat型にキャストする(Nonetypeはキャストしない)
                     if value['type'] in ('NUMBER', 'CALC'):
-                        try:
-                            tmp_dic[key] = int(value['value'])
-                        except:
+                        if value['value'] == None:
+                            tmp_dic[key] = value['value']
+                        else:
                             try:
-                                tmp_dic[key] = float(value['value'])
+                                tmp_dic[key] = int(value['value'])
                             except:
-                                tmp_dic[key] = str(value['value'])
-                    #日付を文字列にキャストする
+                                try:
+                                    tmp_dic[key] = float(value['value'])
+                                except:
+                                    tmp_dic[key] = str(value['value'])
+                    #日付を文字列にキャストする(Nonetypeはキャストしない)
                     if value['type'] in ('TIME', 'DATE', 'DATETIME', 'CREATED_TIME', 'UPDATED_TIME'):
-                        tmp_dic[key] = str(value['value'])
+                        if value['value'] == None:
+                            tmp_dic[key] = value['value']
+                        else:
+                            tmp_dic[key] = str(value['value'])
                     if value['type'] in ('MODIFIER', 'CREATOR'):
                         tmp_dic[key] = value['value']['code']
                     if value['type'] in ('USER_SELECT', 'ORGANIZATION_SELECT', 'GROUP_SELECT'):
@@ -110,15 +116,23 @@ class Kintone:
                                     if sub_value['type'] in ('MODIFIER', 'CREATOR'):
                                         sub_dict[sub_key] = sub_value['value']['code']
                                     elif sub_value['type'] in ('NUMBER', 'CALC'):
-                                        try:
-                                            sub_dict[sub_key] = int(sub_value['value'])
-                                        except:
+                                        #Nonetypeはキャストしない
+                                        if sub_value['value'] == None:
+                                            sub_dict[sub_key] = sub_value['value']
+                                        else:
                                             try:
-                                                sub_dict[sub_key] = float(sub_value['value'])
+                                                sub_dict[sub_key] = int(sub_value['value'])
                                             except:
-                                                sub_dict[sub_key] = str(sub_value['value'])
+                                                try:
+                                                    sub_dict[sub_key] = float(sub_value['value'])
+                                                except:
+                                                    sub_dict[sub_key] = str(sub_value['value'])
                                     elif sub_value['type'] in ('TIME', 'DATE', 'DATETIME', 'CREATED_TIME', 'UPDATED_TIME'):
-                                        sub_dict[sub_key] = str(sub_value['value'])
+                                        #Nonetypeはキャストしない
+                                        if sub_value['value'] == None:
+                                            sub_dict[sub_key] = sub_value['value']
+                                        else:
+                                            sub_dict[sub_key] = str(sub_value['value'])
                                     elif sub_value['type'] in ('USER_SELECT', 'ORGANIZATION_SELECT', 'GROUP_SELECT'):
                                         codes = []
                                         for val in sub_value['value']:
@@ -156,18 +170,24 @@ class Kintone:
                     continue
                 if value['type'] in self.data_type:
                     result[key] = value['value']
-                #intかfloat型にキャストする
+                #intかfloat型にキャストする(Nonetypeはキャストしない)
                 if value['type'] in ('NUMBER','CALC'):
-                    try:
-                        result[key] = int(value['value'])
-                    except:
+                    if value['value'] == None:
+                        result[key] = value['value']
+                    else:
                         try:
-                            result[key] = float(value['value'])
+                            result[key] = int(value['value'])
                         except:
-                            result[key] = str(value['value'])
-                #日付を文字列にキャストする
+                            try:
+                                result[key] = float(value['value'])
+                            except:
+                                result[key] = str(value['value'])
+                #日付を文字列にキャストする(Nonetypeはキャストしない)
                 if value['type'] in ('TIME', 'DATE', 'DATETIME', 'CREATED_TIME', 'UPDATED_TIME'):
-                    result[key] = str(value['value'])
+                    if value['value'] == None:
+                        result[key] = value['value']
+                    else:
+                        result[key] = str(value['value'])
                 if value['type'] in ('MODIFIER','CREATOR'):
                     result[key] = value['value']['code']
                 if value['type'] in ('USER_SELECT', 'ORGANIZATION_SELECT', 'GROUP_SELECT'):
@@ -187,15 +207,23 @@ class Kintone:
                                 if sub_value['type'] in ('MODIFIER', 'CREATOR'):
                                     sub_dict[sub_key] = sub_value['value']['code']
                                 elif sub_value['type'] in ('NUMBER', 'CALC'):
-                                    try:
-                                        sub_dict[sub_key] = int(sub_value['value'])
-                                    except:
+                                    #Nonetypeはキャストしない
+                                    if sub_value['value'] == None:
+                                        sub_dict[sub_key] = sub_value['value']
+                                    else:
                                         try:
-                                            sub_dict[sub_key] = float(sub_value['value'])
+                                            sub_dict[sub_key] = int(sub_value['value'])
                                         except:
-                                            sub_dict[sub_key] = str(sub_value['value'])
+                                            try:
+                                                sub_dict[sub_key] = float(sub_value['value'])
+                                            except:
+                                                sub_dict[sub_key] = str(sub_value['value'])
                                 elif sub_value['type'] in ('TIME', 'DATE', 'DATETIME', 'CREATED_TIME', 'UPDATED_TIME'):
-                                    sub_dict[sub_key] = str(sub_value['value'])
+                                    #Nonetypeはキャストしない
+                                    if sub_value['value'] == None:
+                                        sub_dict[sub_key] = sub_value['value']
+                                    else:
+                                        sub_dict[sub_key] = str(sub_value['value'])
                                 elif sub_value['type'] in ('USER_SELECT', 'ORGANIZATION_SELECT', 'GROUP_SELECT'):
                                     codes = []
                                     for val in sub_value['value']:
