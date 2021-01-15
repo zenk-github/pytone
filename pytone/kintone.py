@@ -29,9 +29,12 @@ class Kintone:
         return result['properties']
 
     def select(self,where=None,order=None,limit=None,fields=None):
-        #フィールドを指定しない場合はすべてのフィールドを取得
-        #whereを指定しない場合、すべてのレコードを取得
-        #idとrevisionは常に取得する
+        """
+        select is function to get records from Kintone.\n
+        Get all fields if "field" is not specified.\n
+        If you do not specify "where", get all records.\n
+        Always get "id" and "revision".
+        """
         params = {
             'app'       : self.app,
             'totalCount': True
@@ -149,6 +152,10 @@ class Kintone:
             return []
 
     def selectRec(self,recordID):
+        """
+        selectRec is function to get 1 record of Kintone.\n
+        recordID = Specify the record ID.
+        """
         params = {
             'app': self.app,
             'id' : recordID
@@ -239,9 +246,17 @@ class Kintone:
             return []
 
     def insert(self,records:list):
+        """
+        insert is Function for inserting records in kintone.\n
+        records = Specify the record information (field code and field value) in the list.\n
+        records = [
+            {
+                'field_code': 'value'
+            }
+        ]
+        """
         if type(records) != list:
-            print('引数にはリスト型を指定してください')
-            sys.exit()
+            raise Exception('Argument is not a list')
         params = {
             'app': self.app,
             "records": [
@@ -253,7 +268,7 @@ class Kintone:
         parameter = self.property
 
         for record in records:
-            #100件づつkintoneに登録する
+            #100件づつKintoneに登録する
             if len(params['records']) == 100:
                 resp = requests.post(url, json=params, headers=self.headers).json()
             for key, value in record.items():
@@ -302,10 +317,16 @@ class Kintone:
 
         return resp
     def insertRec(self,record:dict):
+        """
+        insertRec is Function for inserting 1 record in kintone.\n
+        record = Specify the record information (field code and field value) in the dict.\n
+        record = {
+            'field_code': 'value'
+        }
+        """
         #引数の型チェック
         if type(record) != dict:
-            print('引数には辞書型を指定してください')
-            sys.exit()
+            raise Exception('Argument is not a dict')
         params = {
             'app': self.app,
             "record": {
@@ -358,9 +379,23 @@ class Kintone:
         return resp
 
     def update(self, records:list):
+        """
+        update is function for updating records in kintone.\n
+        records = data to update in kintone.\n
+        records = [
+            {
+                '$id':'1'
+                   or
+                'updateKey': {
+                    'field':'No duplication field code',
+                    'value':'value'
+                }
+                'field_code': 'value'
+            }
+        ]
+        """
         if type(records) != list:
-            print('引数にはリスト型を指定してください')
-            sys.exit()
+            raise Exception('Argument is not a list')
         params = {
             'app': self.app,
             "records": [
@@ -372,7 +407,7 @@ class Kintone:
         parameter = self.property
 
         for record in records:
-            #100件づつkintoneに登録する
+            #100件づつKintoneに登録する
             if len(params['records']) == 100:
                 resp = requests.put(url, json=params, headers=self.headers).json()
             tmp_param['record'] = {}
@@ -441,9 +476,21 @@ class Kintone:
         return resp
 
     def updateRec(self,record:dict):
+        """
+        updateRec is function for updating 1 record in kintone.\n
+        record = data to update in kintone.\n
+        record = {
+            '$id':'1'
+               or
+            'updateKey': {
+                'field':'No duplication field code',
+                'value':'value'
+            }
+            'field_code': 'value'
+        }
+        """
         if type(record) != dict:
-            print('引数には辞書型を指定してください')
-            sys.exit()
+            raise Exception('Argument is not a dict')
         params = {
             'app': self.app,
             "record": {
@@ -504,19 +551,26 @@ class Kintone:
                             'value': sub_dict
                         })
                     continue
-                else:
-                    params['record'][key] = {
-                        'value': value
-                    }
-                    continue
+            else:
+                params['record'][key] = {
+                    'value': value
+                }
+                continue
         resp = requests.put(url, json=params, headers=self.headers).json()
 
         return resp
 
     def delete(self,ids:list,revisions=None):
+        """
+        delete is function for deleting records in kintone.\n
+        ids = Specify the record ID of the record to be deleted as a list.\n
+        revisions = The expected revision number.
+        The order is the same as ids (the revision number expected in the first record of ids is the first number of revisions).
+        If it does not match the actual revision number, an error will occur (no record will be deleted).
+        However, if the value is -1 or not specified, the revision number will not be verified.
+        """
         if type(ids) != list:
-            print('引数にはリスト型を指定してください')
-            sys.exit()
+            raise Exception('Argument is not a list')
 
         params = {
             'app': self.app,
@@ -534,3 +588,63 @@ class Kintone:
 
         return resp
 
+    def postComment(self, recordID, text:str, mentions=None):
+        """
+        docstring
+        """
+        if type(text) != str:
+            raise Exception('Argument is not a str')
+        if mentions is not None and type(mentions) != list:
+            raise Exception('Argument is not a list')
+
+        params = {
+            'app'    : self.app,
+            'record' : recordID,
+            'comment': {
+                'text'    : text,
+                'mentions': mentions if mentions is not None else []
+            }
+        }
+        url = self.rootURL + 'record/comment.json'
+
+        resp = requests.post(url, json=params, headers=self.headers).json()
+
+        return resp
+
+    def deleteComment(self, recordID, commentID):
+        """
+        docstring
+        """
+
+        params = {
+            'app'    : self.app,
+            'record' : recordID,
+            'comment':commentID
+        }
+        url = self.rootURL + 'record/comment.json'
+
+        resp = requests.delete(url, json=params, headers=self.headers).json()
+
+        return resp
+
+    def selectComment(self, recordID, order=None, offset=None, limit=None):
+        """
+        docstring
+        """
+
+        params = {
+            'app'    : self.app,
+            'record' : recordID
+        }
+        url = self.rootURL + 'record/comments.json'
+
+        if order is not None:
+            params['order'] = order
+        if offset is not None:
+            params['offset'] = offset
+        if limit is not None:
+            params['limit'] = limit
+
+        resp = requests.get(url, json=params, headers=self.headers).json()
+
+        return resp
