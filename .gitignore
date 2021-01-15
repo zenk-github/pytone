@@ -4,3 +4,4 @@ pytone/__pycache__/
 build/
 dist/
 zenkPytone.egg-info/
+upload.txt
