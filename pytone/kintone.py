@@ -503,6 +503,8 @@ class Kintone:
 
             ]
         }
+        response = {}
+
         url = self.rootURL + 'records.json'
 
         if revisions is not None:
@@ -510,13 +512,14 @@ class Kintone:
 
         while len(ids) > 100:
             params['ids'] = ids[0:100]
-            resp = self.requestKintone(method='DELETE', url=url, json=params)
+            response = self.requestKintone(method='DELETE', url=url, json=params)
             del ids[0:100]
 
         if ids:
-            resp = self.requestKintone(method='DELETE', url=url, json=params)
+            params['ids'] = ids[0:100]
+            response = self.requestKintone(method='DELETE', url=url, json=params)
 
-        return resp
+        return response
 
     def postComment(self, recordID, text:str, mentions=None):
         """
