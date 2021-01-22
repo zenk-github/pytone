@@ -4,18 +4,53 @@ import requests
 
 class Kintone:
 
-    def __init__(self,apiToken,domain,app):
-        self.apiToken = apiToken
-        self.rootURL  = 'https://{}.cybozu.com/k/v1/'.format(domain)
-        self.app      = app
-        self.data_type = ['__ID__', '__REVISION__',
-                          'SINGLE_LINE_TEXT', 'CHECK_BOX', 'LINK', 'RICH_TEXT',
-                          'RADIO_BUTTON', 'DROP_DOWN', 'MULTI_SELECT', 'MULTI_LINE_TEXT','FILE']
+    def __init__(self,authText,domain,app):
+        self.authText  = authText
+        self.rootURL   = 'https://{}.cybozu.com/k/v1/'.format(domain)
+        self.app       = app
         self.headers   = {
-            'X-Cybozu-API-Token': self.apiToken,
+            'X-Cybozu-Authorization': self.authText,
             'Content-Type': 'application/json'
         }
         self.property  = self.get_property()
+
+    def requestKintone(self, method, url, json):
+        if method == 'GET':
+            try:
+                response = requests.get(url, json=json, headers=self.headers)
+                #ステータスコードチェック
+                response.raise_for_status()
+                return response.json()
+            except requests.exceptions.RequestException:
+                raise Exception(response.json())
+
+        if method == 'POST':
+            try:
+                response = requests.post(url, json=json, headers=self.headers)
+                #ステータスコードチェック
+                response.raise_for_status()
+                return response.json()
+            except requests.exceptions.RequestException:
+                raise Exception(response.json())
+
+        if method == 'PUT':
+            try:
+                response = requests.put(url, json=json, headers=self.headers)
+                #ステータスコードチェック
+                response.raise_for_status()
+                return response.json()
+            except requests.exceptions.RequestException:
+                raise Exception(response.json())
+
+        if method == 'DELETE':
+            try:
+                response = requests.delete(url, json=json, headers=self.headers)
+                #ステータスコードチェック
+                response.raise_for_status()
+                return response.json()
+            except requests.exceptions.RequestException:
+                raise Exception(response.json())
+
 
     def get_property(self):
         params = {
@@ -24,9 +59,9 @@ class Kintone:
         }
         url = self.rootURL + 'app/form/fields.json'
 
-        resp = requests.get(url, json=params, headers=self.headers)
-        result = json.loads(resp.content.decode('utf-8'))
-        return result['properties']
+        response   = self.requestKintone(method='GET', url=url, json=params)
+        properties = response['properties']
+        return properties
 
     def select(self,where=None,order=None,limit=None,fields=None):
         """
@@ -37,119 +72,70 @@ class Kintone:
         """
         params = {
             'app'       : self.app,
-            'totalCount': True
-        }
-        lastRecID = 0
-        responses = {
-            'records':[]
+            'query'     : '',
+            'totalCount': True,
         }
         if fields is not None:
             params['fields'] = list(set(fields + ['$id', '$revision']))
 
-        url = self.rootURL + 'records.json'
-        try:
+        url       = self.rootURL + 'records.json'
+
+        lastRecID = '0'
+        records   = []
+
+
+        #orderが指定されていない時は全件取得する
+        if order is None:
             while True:
                 if where is None:
-                    if order is None:
-                        params['query'] = '($id > {}) '.format(str(lastRecID)) + 'order by $id asc'
-                    else:
-                        params['query'] = '($id > {}) '.format(str(lastRecID)) + order
+                    params['query'] = '($id > ' + lastRecID + ' ) order by $id asc'
                 else:
-                    if order is None:
-                        params['query'] = '($id > {}) and ('.format(str(lastRecID)) + where + ') order by $id asc'
-                    else:
-                        params['query'] = '($id > {}) and ('.format(str(lastRecID)) + where + ') ' + order
-                if limit is not None:
-                    params['query'] = params['query'] + ' limit ' + str(limit)
-                resp = requests.get(url, json=params, headers=self.headers)
-                resp.raise_for_status()
-                response = json.loads(resp.content.decode('utf-8'))
+                    params['query'] = '($id > ' + lastRecID + ' ) and (' + where + ') order by $id asc'
+                if limit is None:
+                    params['query'] += ' limit 500'
+                else:
+                    params['query'] += ' limit ' + str(limit)
+
+                response = self.requestKintone(method='GET', url=url, json=params)
                 if response['totalCount'] == '0':
                     break
                 #レコードIDの最大値を取得
-                response_sorted = sorted(response['records'], key=lambda x:x['$id']['value'])
-                lastRecID = int(response_sorted[len(response_sorted) -1]['$id']['value'])
-                responses['records'] += response['records']
-        except requests.exceptions.RequestException:
-            message = ('error： ', json.loads(resp.content.decode('utf-8')))
-            return message
+                lastRecID = response['records'][-1]['$id']['value']
 
-        try:
-            result = []
-            tmp    = responses
-            for record in tmp['records']:
-                tmp_dic = {}
-                for key,value in record.items():
-                    if value['type'] in self.data_type:
-                        tmp_dic[key] = value['value']
-                    #intかfloat型にキャストする(Nonetypeはキャストしない)
-                    if value['type'] in ('NUMBER', 'CALC'):
-                        if value['value'] == None:
-                            tmp_dic[key] = value['value']
-                        else:
-                            try:
-                                tmp_dic[key] = int(value['value'])
-                            except:
-                                try:
-                                    tmp_dic[key] = float(value['value'])
-                                except:
-                                    tmp_dic[key] = str(value['value'])
-                    #日付を文字列にキャストする(Nonetypeはキャストしない)
-                    if value['type'] in ('TIME', 'DATE', 'DATETIME', 'CREATED_TIME', 'UPDATED_TIME'):
-                        if value['value'] == None:
-                            tmp_dic[key] = value['value']
-                        else:
-                            tmp_dic[key] = str(value['value'])
-                    if value['type'] in ('MODIFIER', 'CREATOR'):
-                        tmp_dic[key] = value['value']['code']
-                    if value['type'] in ('USER_SELECT', 'ORGANIZATION_SELECT', 'GROUP_SELECT'):
-                        codes = []
-                        for val in value['value']:
-                            codes.append(val['code'])
-                        tmp_dic[key] = codes
-                    if value['type'] == 'SUBTABLE':
-                        subtable = []
-                        sub_dict = {}
-                        for sub_rec in value['value']:
-                            for sub_keys,sub_values in sub_rec.items():
-                                if sub_keys == 'id':
-                                    sub_dict['id'] = sub_values
-                                    continue
-                                for sub_key,sub_value in sub_values.items():
-                                    if sub_value['type'] in ('MODIFIER', 'CREATOR'):
-                                        sub_dict[sub_key] = sub_value['value']['code']
-                                    elif sub_value['type'] in ('NUMBER', 'CALC'):
-                                        #Nonetypeはキャストしない
-                                        if sub_value['value'] == None:
-                                            sub_dict[sub_key] = sub_value['value']
-                                        else:
-                                            try:
-                                                sub_dict[sub_key] = int(sub_value['value'])
-                                            except:
-                                                try:
-                                                    sub_dict[sub_key] = float(sub_value['value'])
-                                                except:
-                                                    sub_dict[sub_key] = str(sub_value['value'])
-                                    elif sub_value['type'] in ('TIME', 'DATE', 'DATETIME', 'CREATED_TIME', 'UPDATED_TIME'):
-                                        #Nonetypeはキャストしない
-                                        if sub_value['value'] == None:
-                                            sub_dict[sub_key] = sub_value['value']
-                                        else:
-                                            sub_dict[sub_key] = str(sub_value['value'])
-                                    elif sub_value['type'] in ('USER_SELECT', 'ORGANIZATION_SELECT', 'GROUP_SELECT'):
-                                        codes = []
-                                        for val in sub_value['value']:
-                                            codes.append(val['code'])
-                                        sub_dict[sub_key] = codes
-                                    else:
-                                        sub_dict[sub_key] = sub_value['value']
-                                subtable.append(sub_dict)
-                                sub_dict = {}
-                        tmp_dic[key] = subtable
-                result.append(tmp_dic)
-            return result
-        except:
-            return []
+                records.extend(response['records'])
+        else:
+            if where is None:
+                params['query'] = '($id > ' + lastRecID + ' ) ' + order
+            else:
+                params['query'] = '($id > ' + lastRecID + ' ) and (' + where + ') ' + order
+
+            if limit is None:
+                params['query'] += ' limit 500'
+            else:
+                params['query'] += ' limit ' + str(limit)
+            response = self.requestKintone(method='GET', url=url, json=params)
+            records.extend(response['records'])
+
+        result = []
+        for record in records:
+            tmp_record = {}
+            for field_code, value in record.items():
+                field_type  = value['type' ]
+                field_value = value['value']
+
+                if field_type == 'SUBTABLE':
+                    subtable        = []
+                    for sub_rec in field_value:
+                        subtable_record = {}
+                        subtable_record['id'] = sub_rec['id']
+                        for sub_field_code, sub_value in sub_rec['value'].items():
+                            subtable_record[sub_field_code] = sub_value['value']
+                        subtable.append(subtable_record)
+                    field_value = subtable
+
+                tmp_record[field_code] = field_value
+            result.append(tmp_record)
+        return result
 
     def selectRec(self,recordID):
         """
@@ -162,88 +148,26 @@ class Kintone:
         }
         url = self.rootURL + 'record.json'
 
-        try:
-            resp = requests.get(url, json=params, headers=self.headers)
-            resp.raise_for_status()
-        except requests.exceptions.RequestException:
-            message = ('error： ', json.loads(resp.content.decode('utf-8')))
-            return message
+        record = self.requestKintone(method='GET', url=url, json=params)
+        result = {}
 
-        try:
-            tmp = json.loads(resp.content.decode('utf-8'))
-            result = {}
-            for key,value in tmp['record'].items():
-                if key == 'レコード番号':
-                    continue
-                if value['type'] in self.data_type:
-                    result[key] = value['value']
-                #intかfloat型にキャストする(Nonetypeはキャストしない)
-                if value['type'] in ('NUMBER','CALC'):
-                    if value['value'] == None:
-                        result[key] = value['value']
-                    else:
-                        try:
-                            result[key] = int(value['value'])
-                        except:
-                            try:
-                                result[key] = float(value['value'])
-                            except:
-                                result[key] = str(value['value'])
-                #日付を文字列にキャストする(Nonetypeはキャストしない)
-                if value['type'] in ('TIME', 'DATE', 'DATETIME', 'CREATED_TIME', 'UPDATED_TIME'):
-                    if value['value'] == None:
-                        result[key] = value['value']
-                    else:
-                        result[key] = str(value['value'])
-                if value['type'] in ('MODIFIER','CREATOR'):
-                    result[key] = value['value']['code']
-                if value['type'] in ('USER_SELECT', 'ORGANIZATION_SELECT', 'GROUP_SELECT'):
-                    codes = []
-                    for val in value['value']:
-                        codes.append(val['code'])
-                    result[key] = codes
-                if value['type'] == 'SUBTABLE':
-                    subtable = []
-                    sub_dict = {}
-                    for sub_rec in value['value']:
-                        for sub_keys, sub_values in sub_rec.items():
-                            if sub_keys == 'id':
-                                sub_dict['id'] = sub_values
-                                continue
-                            for sub_key, sub_value in sub_values.items():
-                                if sub_value['type'] in ('MODIFIER', 'CREATOR'):
-                                    sub_dict[sub_key] = sub_value['value']['code']
-                                elif sub_value['type'] in ('NUMBER', 'CALC'):
-                                    #Nonetypeはキャストしない
-                                    if sub_value['value'] == None:
-                                        sub_dict[sub_key] = sub_value['value']
-                                    else:
-                                        try:
-                                            sub_dict[sub_key] = int(sub_value['value'])
-                                        except:
-                                            try:
-                                                sub_dict[sub_key] = float(sub_value['value'])
-                                            except:
-                                                sub_dict[sub_key] = str(sub_value['value'])
-                                elif sub_value['type'] in ('TIME', 'DATE', 'DATETIME', 'CREATED_TIME', 'UPDATED_TIME'):
-                                    #Nonetypeはキャストしない
-                                    if sub_value['value'] == None:
-                                        sub_dict[sub_key] = sub_value['value']
-                                    else:
-                                        sub_dict[sub_key] = str(sub_value['value'])
-                                elif sub_value['type'] in ('USER_SELECT', 'ORGANIZATION_SELECT', 'GROUP_SELECT'):
-                                    codes = []
-                                    for val in sub_value['value']:
-                                        codes.append(val['code'])
-                                    sub_dict[sub_key] = codes
-                                else:
-                                    sub_dict[sub_key] = sub_value['value']
-                            subtable.append(sub_dict)
-                            sub_dict = {}
-                    result[key] = subtable
-            return result
-        except:
-            return []
+        for field_code, value in record['record'].items():
+            field_type  = value['type' ]
+            field_value = value['value']
+
+            if field_type == 'SUBTABLE':
+                subtable        = []
+                for sub_rec in field_value:
+                    subtable_record = {}
+                    subtable_record['id'] = sub_rec['id']
+                    for sub_field_code, sub_value in sub_rec['value'].items():
+                        subtable_record[sub_field_code] = sub_value['value']
+                    subtable.append(subtable_record)
+                field_value = subtable
+
+            result[field_code] = field_value
+
+        return result
 
     def insert(self,records:list):
         """
@@ -270,7 +194,7 @@ class Kintone:
         for record in records:
             #100件づつKintoneに登録する
             if len(params['records']) == 100:
-                resp = requests.post(url, json=params, headers=self.headers).json()
+                resp = self.requestKintone(method='POST', url=url, json=params)
             for key, value in record.items():
                 if key not in parameter:
                     continue
@@ -302,7 +226,7 @@ class Kintone:
                                 }
                         tmp_param[key]['value'].append({
                                 'value':sub_dict
-                                })
+                        })
                     continue
                 else:
                     tmp_param[key] = {
@@ -313,7 +237,7 @@ class Kintone:
             tmp_param = {}
         #最後に残りを追加する
         if params['records']:
-            resp = requests.post(url, json=params, headers=self.headers).json()
+            resp = self.requestKintone(method='POST', url=url, json=params)
 
         return resp
     def insertRec(self,record:dict):
@@ -374,7 +298,7 @@ class Kintone:
                     'value': value
                 }
                 continue
-        resp = requests.post(url, json=params, headers=self.headers).json()
+        resp = self.requestKintone(method='POST', url=url, json=params)
 
         return resp
 
@@ -409,7 +333,7 @@ class Kintone:
         for record in records:
             #100件づつKintoneに登録する
             if len(params['records']) == 100:
-                resp = requests.put(url, json=params, headers=self.headers).json()
+                resp = self.requestKintone(method='PUT', url=url, json=params)
             tmp_param['record'] = {}
             for key, value in record.items():
                 #レコードIDを取得する
@@ -471,7 +395,7 @@ class Kintone:
             tmp_param = {}
         #最後に残りを追加する
         if params['records']:
-            resp = requests.put(url, json=params, headers=self.headers).json()
+            resp = self.requestKintone(method='PUT', url=url, json=params)
 
         return resp
 
@@ -556,7 +480,7 @@ class Kintone:
                     'value': value
                 }
                 continue
-        resp = requests.put(url, json=params, headers=self.headers).json()
+        resp = self.requestKintone(method='PUT', url=url, json=params)
 
         return resp
 
@@ -584,7 +508,7 @@ class Kintone:
             params['revisions'] = revisions
         params['ids'] = ids
 
-        resp = requests.delete(url, json=params, headers=self.headers).json()
+        resp = self.requestKintone(method='PUT', url=url, json=params)
 
         return resp
 
@@ -607,7 +531,7 @@ class Kintone:
         }
         url = self.rootURL + 'record/comment.json'
 
-        resp = requests.post(url, json=params, headers=self.headers).json()
+        resp = self.requestKintone(method='POST', url=url, json=params)
 
         return resp
 
@@ -623,7 +547,7 @@ class Kintone:
         }
         url = self.rootURL + 'record/comment.json'
 
-        resp = requests.delete(url, json=params, headers=self.headers).json()
+        resp = self.requestKintone(method='DELETE', url=url, json=params)
 
         return resp
 
@@ -645,6 +569,6 @@ class Kintone:
         if limit is not None:
             params['limit'] = limit
 
-        resp = requests.get(url, json=params, headers=self.headers).json()
+        resp = self.requestKintone(method='GET', url=url, json=params)
 
         return resp
