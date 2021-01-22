@@ -507,9 +507,14 @@ class Kintone:
 
         if revisions is not None:
             params['revisions'] = revisions
-        params['ids'] = ids
 
-        resp = self.requestKintone(method='PUT', url=url, json=params)
+        while len(ids) > 100:
+            params['ids'] = ids[0:100]
+            resp = self.requestKintone(method='DELETE', url=url, json=params)
+            del ids[0:100]
+
+        if ids:
+            resp = self.requestKintone(method='DELETE', url=url, json=params)
 
         return resp
 
