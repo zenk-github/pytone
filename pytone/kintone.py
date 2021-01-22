@@ -195,6 +195,7 @@ class Kintone:
             #100件づつKintoneに登録する
             if len(params['records']) == 100:
                 resp = self.requestKintone(method='POST', url=url, json=params)
+                params['records'] = []
             for key, value in record.items():
                 if key not in parameter:
                     continue
