@@ -337,7 +337,7 @@ class Kintone:
                 resp = self.requestKintone(method='PUT', url=url, json=params)
             tmp_param['record'] = {}
             for key, value in record.items():
-                if key == '$revsion':
+                if key == '$revision':
                     continue
                 #レコードIDを取得する
                 if key in ('id','$id'):
@@ -428,6 +428,8 @@ class Kintone:
         parameter = self.property
 
         for key, value in record.items():
+            if key == '$revision':
+                continue
             #レコードIDを取得する
             if key in ('id', '$id'):
                 params['id'] = value
