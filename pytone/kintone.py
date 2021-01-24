@@ -337,6 +337,8 @@ class Kintone:
                 resp = self.requestKintone(method='PUT', url=url, json=params)
             tmp_param['record'] = {}
             for key, value in record.items():
+                if key == '$revsion':
+                    continue
                 #レコードIDを取得する
                 if key in ('id','$id'):
                     tmp_param['id'] = value
