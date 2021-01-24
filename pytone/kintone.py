@@ -123,12 +123,26 @@ class Kintone:
                 field_type  = value['type' ]
                 field_value = value['value']
 
+                if field_type == 'NUMBER' and field_value is not None:
+                    #intかfloatにキャスト
+                    try:
+                        field_value = int(field_value)
+                    except ValueError:
+                        field_value = float(field_value)
+
                 if field_type == 'SUBTABLE':
                     subtable        = []
                     for sub_rec in field_value:
                         subtable_record = {}
                         subtable_record['id'] = sub_rec['id']
                         for sub_field_code, sub_value in sub_rec['value'].items():
+                            if sub_value['type'] == 'NUMBER' and field_value is not None:
+                                #intかfloatにキャスト
+                                try:
+                                    sub_value['value'] = int(sub_value['value'])
+                                except ValueError:
+                                    sub_value['value'] = float(sub_value['value'])
+
                             subtable_record[sub_field_code] = sub_value['value']
                         subtable.append(subtable_record)
                     field_value = subtable
@@ -155,12 +169,26 @@ class Kintone:
             field_type  = value['type' ]
             field_value = value['value']
 
+            if field_type == 'NUMBER' and field_value is not None:
+                #intかfloatにキャスト
+                try:
+                    field_value = int(field_value)
+                except ValueError:
+                    field_value = float(field_value)
+
             if field_type == 'SUBTABLE':
                 subtable        = []
                 for sub_rec in field_value:
                     subtable_record = {}
                     subtable_record['id'] = sub_rec['id']
                     for sub_field_code, sub_value in sub_rec['value'].items():
+                        if sub_value['type'] == 'NUMBER' and field_value is not None:
+                            #intかfloatにキャスト
+                            try:
+                                sub_value['value'] = int(sub_value['value'])
+                            except ValueError:
+                                sub_value['value'] = float(sub_value['value'])
+
                         subtable_record[sub_field_code] = sub_value['value']
                     subtable.append(subtable_record)
                 field_value = subtable
