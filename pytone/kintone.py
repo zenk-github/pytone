@@ -123,7 +123,7 @@ class Kintone:
                 field_type  = value['type' ]
                 field_value = value['value']
 
-                if field_type == 'NUMBER' and field_value is not None:
+                if field_type == 'NUMBER' and field_value is not None and field_value != "":
                     #intかfloatにキャスト
                     try:
                         field_value = int(field_value)
@@ -169,7 +169,7 @@ class Kintone:
             field_type  = value['type' ]
             field_value = value['value']
 
-            if field_type == 'NUMBER' and field_value is not None:
+            if field_type == 'NUMBER' and field_value is not None and field_value != "":
                 #intかfloatにキャスト
                 try:
                     field_value = int(field_value)
