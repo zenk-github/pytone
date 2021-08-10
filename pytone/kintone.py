@@ -446,6 +446,7 @@ class Kintone:
             #100件づつKintoneに登録する
             if len(params['records']) == 100:
                 resp = self.requestKintone(method='PUT', url=url, json=params)
+                params['records'] = []
             tmp_param['record'] = {}
             for key, value in record.items():
                 if key == '$revision':
