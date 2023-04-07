@@ -287,14 +287,6 @@ class Kintone:
                         'value': codes
                     }
                     continue
-                elif parameter[key]['type'] == 'FILE':
-                    fileKeys = []
-                    for val in value:
-                        fileKeys.append({'fileKey': val})
-                    tmp_param[key] = {
-                        'value': fileKeys
-                    }
-                    continue
                 elif parameter[key]['type'] == 'SUBTABLE':
                     tmp_param[key] = {
                         'value': []
@@ -308,13 +300,6 @@ class Kintone:
                                     codes.append({'code': val})
                                 sub_dict[sub_key] = {
                                     'value':codes
-                                }
-                            elif parameter[key]['fields'][sub_key]['type'] == 'FILE':
-                                fileKeys = []
-                                for val in sub_value:
-                                    fileKeys.append({'fileKey': val})
-                                sub_dict[sub_key] = {
-                                    'value': fileKeys
                                 }
                             else:
                                 sub_dict[sub_key] = {
@@ -367,14 +352,6 @@ class Kintone:
                     'value': codes
                 }
                 continue
-            elif parameter[key]['type'] == 'FILE':
-                fileKeys = []
-                for val in value:
-                    fileKeys.append({'fileKey': val})
-                params['record'][key] = {
-                    'value': fileKeys
-                }
-                continue
             elif parameter[key]['type'] == 'SUBTABLE':
                 params['record'][key] = {
                     'value': []
@@ -388,13 +365,6 @@ class Kintone:
                                 codes.append({'code': val})
                             sub_dict[sub_key] = {
                                 'value': codes
-                            }
-                        elif parameter[key]['fields'][sub_key]['type'] == 'FILE':
-                            fileKeys = []
-                            for val in sub_value:
-                                fileKeys.append({'fileKey': val})
-                            sub_dict[sub_key] = {
-                                'value': fileKeys
                             }
                         else:
                             sub_dict[sub_key] = {
@@ -446,7 +416,6 @@ class Kintone:
             #100件づつKintoneに登録する
             if len(params['records']) == 100:
                 resp = self.requestKintone(method='PUT', url=url, json=params)
-                params['records'] = []
             tmp_param['record'] = {}
             for key, value in record.items():
                 if key == '$revision':
@@ -469,14 +438,6 @@ class Kintone:
                         'value': codes
                     }
                     continue
-                elif parameter[key]['type'] == 'FILE':
-                    fileKeys = []
-                    for val in value:
-                        fileKeys.append({'fileKey': val})
-                    tmp_param['record'][key] = {
-                        'value': fileKeys
-                    }
-                    continue
                 elif parameter[key]['type'] == 'SUBTABLE':
                     tmp_param['record'][key] = {
                         'value': []
@@ -494,13 +455,6 @@ class Kintone:
                                     codes.append({'code': val})
                                 sub_dict[sub_key] = {
                                     'value': codes
-                                }
-                            elif parameter[key]['fields'][sub_key]['type'] == 'FILE':
-                                fileKeys = []
-                                for val in sub_value:
-                                    fileKeys.append({'fileKey': val})
-                                sub_dict[sub_key] = {
-                                    'value': fileKeys
                                 }
                             else:
                                 sub_dict[sub_key] = {
@@ -575,14 +529,6 @@ class Kintone:
                     'value': codes
                 }
                 continue
-            elif parameter[key]['type'] == 'FILE':
-                fileKeys = []
-                for val in value:
-                    fileKeys.append({'fileKey': val})
-                params['record'][key] = {
-                    'value': fileKeys
-                }
-                continue
             elif parameter[key]['type'] == 'SUBTABLE':
                 params['record'][key] = {
                     'value': []
@@ -600,13 +546,6 @@ class Kintone:
                                 codes.append({'code': val})
                             sub_dict[sub_key] = {
                                 'value': codes
-                            }
-                        elif parameter[key]['fields'][sub_key]['type'] == 'FILE':
-                            fileKeys = []
-                            for val in sub_value:
-                                fileKeys.append({'fileKey': val})
-                            sub_dict[sub_key] = {
-                                'value': fileKeys
                             }
                         else:
                             sub_dict[sub_key] = {
