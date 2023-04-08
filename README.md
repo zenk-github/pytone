@@ -3,18 +3,25 @@
 pytoneは[Kintone](https://kintone.cybozu.co.jp/index.html)にアクセスするためのPythonライブラリです。
 
 ```python
-from pytone import kintone
+from pytone import kintone, kintone_file
 
-kintone = kintone.Kintone('APIトークン', 'サブドメイン', 'アプリID')
+kintone      = kintone.Kintone('APIトークン', 'サブドメイン', 'アプリID')
+kintone_file = kintone_file.KintoneFile('APIトークン', 'サブドメイン')
 ```
 # Features
 
 pytoneはKintoneをPythonで操作するためのライブラリです。  
-pytoneは[KintoneAPI](https://developer.cybozu.io/hc/ja/articles/360000313406-kintone-REST-API%E4%B8%80%E8%A6%A7)の以下に対応しています
-* [GET](https://developer.cybozu.io/hc/ja/articles/202331474)
-* [POST](https://developer.cybozu.io/hc/ja/articles/202166160)
-* [PUT](https://developer.cybozu.io/hc/ja/articles/201941784)
-* [DELETE](https://developer.cybozu.io/hc/ja/articles/201941794)
+pytoneは[Kintone REST API](https://developer.cybozu.io/hc/ja/articles/360000313406-kintone-REST-API%E4%B8%80%E8%A6%A7)の以下に対応しています
+* [レコードの取得](https://developer.cybozu.io/hc/ja/articles/202331474)
+* [レコードの一括取得](https://developer.cybozu.io/hc/ja/articles/360029152012)
+* [レコードの登録](https://developer.cybozu.io/hc/ja/articles/202166160)
+* [レコードの更新](https://developer.cybozu.io/hc/ja/articles/201941784)
+* [レコードの削除](https://developer.cybozu.io/hc/ja/articles/201941794)
+* [レコードコメントの投稿](https://developer.cybozu.io/hc/ja/articles/209758903)
+* [レコードコメントの削除](https://developer.cybozu.io/hc/ja/articles/209758703)
+* [レコードコメントの一括取得](https://developer.cybozu.io/hc/ja/articles/208242326)
+* [ファイルアップロード](https://developer.cybozu.io/hc/ja/articles/201941824)
+* [ファイルダウンロード](https://developer.cybozu.io/hc/ja/articles/202166180)
 # Requirement
 
 pytoneはPython3系で動作し、以下のライブラリに依存します。
@@ -31,19 +38,18 @@ pip install zenkPytone
 [![Downloads](https://pepy.tech/badge/zenkpytone)](https://pepy.tech/project/zenkpytone)
 # Usage
 
-* レコードの取得（一括）
+* レコードの取得（複数）
 ```python
 #呼び出し方
-kintone.select(where=where,order=order,limti=limit,fields=fields)
+kintone.select(where,order,limit,fields)
 """
 引数は省略可能です
 
-・whereを省略した場合、アプリの全レコードを取得します
 ・レコードのソートをする場合はwhereには書かず、orderに記述してください
 ・limitを指定する場合はwhereには書かず、limitに数値を記述してください
 ・fieldsを省略した場合、全フィールドを取得します
 ・idとrevisionは指定していなくても取得します
-・対象のレコードをすべて取得します。（offset上限対応）
+・500件より多いレコードを取得することは出来ません
 """
 
 #例
@@ -129,6 +135,70 @@ response = kintone.selectRec(recordID)
         }
     ],
 }
+
+"""
+```
+* レコードの取得（全件）
+```python
+#呼び出し方
+kintone.selectAll(where,fields)
+"""
+引数は省略可能です
+
+・order byを指定することはできません
+・limitを指定することはできません
+・fieldsを省略した場合、全フィールドを取得します
+・idとrevisionは指定していなくても取得します
+・対象のレコードをすべて取得します（offset上限対応）
+"""
+
+#例
+where    = 'フィールドコート１ = "value"'
+fields   = ['フィールドコート１','フィールドコート２','サブテーブル']
+response = kintone.select(where=where, fields=fields)
+
+"""
+レスポンスの例
+[
+    {
+        '$id':1,
+        'revision':1,
+        'フィールドコート１':'value',
+        'フィールドコート２':'value',
+        'サブテーブル':
+        [
+            {
+                'id': '1111111',   #テーブルの行ID
+                'フィールドコート１':'value',
+                'フィールドコート２':'value',
+            },
+            {
+                'id': '1111112',   #テーブルの行ID
+                'フィールドコート１':'value',
+                'フィールドコート２':'value',
+            }
+        ]
+    },
+    {
+        '$id':2,
+        'revision':1,
+        'フィールドコート１':'value',
+        'フィールドコート２':'value',
+        'サブテーブル':
+        [
+            {
+                'id': '2222222',   #テーブルの行ID
+                'フィールドコート１':'value',
+                'フィールドコート２':'value',
+            },
+            {
+                'id': '2222223',   #テーブルの行ID
+                'フィールドコート１':'value',
+                'フィールドコート２':'value',
+            }
+        ]
+    }
+]
 
 """
 ```
@@ -392,6 +462,145 @@ response = kintone.delete(recordIDs)
 {}
 """
 #リクエスト成功時は空の辞書が戻ってきます
+```
+* レコードコメントの投稿
+```python
+#呼び出し方
+kintone.postComment(recordID, text, mentions)
+
+#例
+
+text      = "システムからのコメントです。\nご確認をお願いします。"
+mentions  = [
+    {
+        "code": "takahashi",
+        "type": "USER"
+    },
+    {
+        // メンション先のユーザーにゲストユーザーを指定する場合
+        "code": "guest/yamada@test.jp",
+        "type": "USER"
+    },
+]
+
+response = kintone.postComment(recordID=1, text=text, mentions=mentions)
+"""
+レスポンスの例
+{
+    "id": 1
+}
+"""
+#投稿したコメントのIDが返されます
+```
+
+* レコードコメントの削除
+```python
+#呼び出し方
+kintone.deleteComment(recordID, commentID)
+
+#例
+response = kintone.deleteComment(recordID=1, comment=1)
+
+"""
+レスポンスの例
+{}
+"""
+#リクエスト成功時は空の辞書が戻ってきます
+```
+
+* レコードコメントの一括取得
+```python
+#呼び出し方
+kintone.selectComment(recordID, order, offset, limit)
+"""
+order,offset,limitは省略可能です
+"""
+
+#例
+response = kintone.selectComment(recordID=1, order='desc', offset=0, limit=10)
+
+"""
+レスポンスの例
+{
+    "comments": [
+        {
+            "id": "2",
+            "text": "佐藤　昇 \nありがとうございます。内容を確認しました。\n引き続きよろしくお願いします！",
+            "createdAt": "2016-04-12T23:49:00Z",
+            "creator": {
+                "code": "kato",
+                "name": "加藤　美咲"
+            },
+            "mentions": [
+                {
+                    "code": "sato",
+                    "type": "USER"
+                }
+            ]
+        },
+        {
+            "id": "1",
+            "text": "加藤　美咲   営業本部 管理部受付 \n\n本日の作業レポートです。\n高橋　しおり さん、ご確認をお願いします。",
+            "createdAt": "2016-04-12T23:46:00Z",
+            "creator": {
+                "code": "sato",
+                "name": "佐藤　昇"
+            },
+            "mentions": [
+                {
+                    "code": "kato",
+                    "type": "USER"
+                },
+                {
+                    "code": "営業本部_OZKQWZ",
+                    "type": "ORGANIZATION"
+                },
+                {
+                    "code": "管理部受付_zX6C6r",
+                    "type": "GROUP"
+                },
+                {
+                    "code": "takahashi",
+                    "type": "USER"
+                }
+            ]
+        }
+    ],
+    "older": false,
+    "newer": false
+}
+"""
+```
+
+* ファイルのアップロード
+```python
+#呼び出し方
+kintone_file.uploadFile(file)
+
+#例
+with open('ファイルのパス', mode='rb') as f:
+    response = kintone_file.uploadFile(f)
+
+"""
+レスポンスの例
+{
+    "fileKey": "c15b3870-7505-4ab6-9d8d-b9bdbc74f5d6"
+}
+"""
+```
+
+* ファイルのダウンロード
+```python
+#呼び出し方
+kintone_file.downloadFile(fileKey)
+
+#例
+fileKey  = 'c15b3870-7505-4ab6-9d8d-b9bdbc74f5d6'
+response = kintone_file.downloadFile(fileKey=fileKey)
+
+"""
+バイナリデータがレスポンスされます
+"""
 ```
 
 # Author
