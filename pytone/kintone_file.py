@@ -2,11 +2,11 @@ import requests
 import json
 
 class KintoneFile:
-    def __init__(self, authText, domain):
-        self.authText  = authText
+    def __init__(self, api_token, domain):
+        self.api_token  = api_token
         self.rootURL   = 'https://{}.cybozu.com/k/v1/file.json'.format(domain)
         self.headers   = {
-            'X-Cybozu-Authorization': self.authText,
+            "X-Cybozu-API-Token": self.api_token,
         }
 
     def downloadFile(self, fileKey):
