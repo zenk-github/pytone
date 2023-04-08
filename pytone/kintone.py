@@ -4,12 +4,12 @@ import requests
 
 class Kintone:
 
-    def __init__(self,authText,domain,app):
-        self.authText  = authText
+    def __init__(self,api_token,domain,app):
+        self.api_token = api_token
         self.rootURL   = 'https://{}.cybozu.com/k/v1/'.format(domain)
         self.app       = app
         self.headers   = {
-            'X-Cybozu-Authorization': self.authText,
+            "X-Cybozu-API-Token": self.api_token,
             'Content-Type': 'application/json'
         }
         self.property  = self.get_property()
@@ -63,9 +63,9 @@ class Kintone:
         properties = response['properties']
         return properties
 
-    def select(self,where=None,order=None,limit=None,fields=None):
+    def selectAll(self,where=None, fields=None):
         """
-        select is function to get records from Kintone.\n
+        selectAll is function to get records from Kintone.\n
         Get all fields if "field" is not specified.\n
         If you do not specify "where", get all records.\n
         Always get "id" and "revision".
@@ -83,38 +83,23 @@ class Kintone:
         lastRecID = '0'
         records   = []
 
-
-        #orderが指定されていない時は全件取得する
-        if order is None:
-            while True:
-                if where is None:
-                    params['query'] = '($id > ' + lastRecID + ' ) order by $id asc'
-                else:
-                    params['query'] = '($id > ' + lastRecID + ' ) and (' + where + ') order by $id asc'
-                if limit is None:
-                    params['query'] += ' limit 500'
-                else:
-                    params['query'] += ' limit ' + str(limit)
-
-                response = self.requestKintone(method='GET', url=url, json=params)
-                if response['totalCount'] == '0':
-                    break
-                #レコードIDの最大値を取得
-                lastRecID = response['records'][-1]['$id']['value']
-
-                records.extend(response['records'])
-        else:
+        while True:
             if where is None:
-                params['query'] = '($id > ' + lastRecID + ' ) ' + order
+                params['query'] = '($id > ' + lastRecID + ' ) order by $id asc limit 500'
             else:
-                params['query'] = '($id > ' + lastRecID + ' ) and (' + where + ') ' + order
+                params['query'] = '($id > ' + lastRecID + ' ) and (' + where + ') order by $id asc limit 500'
 
-            if limit is None:
-                params['query'] += ' limit 500'
-            else:
-                params['query'] += ' limit ' + str(limit)
-            response = self.requestKintone(method='GET', url=url, json=params)
+            response   = self.requestKintone(method='GET', url=url, json=params)
+            totalCount = int(response['totalCount'])
+
+            if totalCount == 0:
+                break
+            #レコードIDの最大値を取得
+            lastRecID = response['records'][-1]['$id']['value']
             records.extend(response['records'])
+
+            if totalCount <= 500:
+                break
 
         result = []
         for record in records:
@@ -149,6 +134,72 @@ class Kintone:
 
                 tmp_record[field_code] = field_value
             result.append(tmp_record)
+
+        return result
+
+    def select(self,where=None, order=None , limit=None, fields=None):
+        """
+        select is function to get records from Kintone.\n
+        Get all fields if "field" is not specified.\n
+        If you do not specify "where", get all records.\n
+        Always get "id" and "revision".
+        """
+        params = {
+            'app'       : self.app,
+            'query'     : '($id > 0)',
+            'totalCount': True,
+        }
+        if fields is not None:
+            params['fields'] = list(set(fields + ['$id', '$revision']))
+
+        url       = self.rootURL + 'records.json'
+
+        if where is not None:
+            params['query'] += ' and (' + where + ')'
+
+        if order is not None:
+            params['query'] += ' ' + order
+
+        if limit is not None:
+            params['query'] += ' limit ' + str(limit)
+
+        response = self.requestKintone(method='GET', url=url, json=params)
+        records  = response['records']
+
+        result = []
+        for record in records:
+            tmp_record = {}
+            for field_code, value in record.items():
+                field_type  = value['type' ]
+                field_value = value['value']
+
+                if field_type == 'NUMBER' and field_value is not None and field_value != "":
+                    #intかfloatにキャスト
+                    try:
+                        field_value = int(field_value)
+                    except ValueError:
+                        field_value = float(field_value)
+
+                if field_type == 'SUBTABLE':
+                    subtable        = []
+                    for sub_rec in field_value:
+                        subtable_record = {}
+                        subtable_record['id'] = sub_rec['id']
+                        for sub_field_code, sub_value in sub_rec['value'].items():
+                            if sub_value['type'] == 'NUMBER' and field_value is not None:
+                                #intかfloatにキャスト
+                                try:
+                                    sub_value['value'] = int(sub_value['value'])
+                                except ValueError:
+                                    sub_value['value'] = float(sub_value['value'])
+
+                            subtable_record[sub_field_code] = sub_value['value']
+                        subtable.append(subtable_record)
+                    field_value = subtable
+
+                tmp_record[field_code] = field_value
+            result.append(tmp_record)
+
         return result
 
     def selectRec(self,recordID):
@@ -218,6 +269,7 @@ class Kintone:
         tmp_param = {}
         url       = self.rootURL + 'records.json'
         parameter = self.property
+        resp      = []
 
         for record in records:
             #100件づつKintoneに登録する
@@ -235,6 +287,14 @@ class Kintone:
                         'value': codes
                     }
                     continue
+                elif parameter[key]['type'] == 'FILE':
+                    fileKeys = []
+                    for val in value:
+                        fileKeys.append({'fileKey': val})
+                    tmp_param[key] = {
+                        'value': fileKeys
+                    }
+                    continue
                 elif parameter[key]['type'] == 'SUBTABLE':
                     tmp_param[key] = {
                         'value': []
@@ -248,6 +308,13 @@ class Kintone:
                                     codes.append({'code': val})
                                 sub_dict[sub_key] = {
                                     'value':codes
+                                }
+                            elif parameter[key]['fields'][sub_key]['type'] == 'FILE':
+                                fileKeys = []
+                                for val in sub_value:
+                                    fileKeys.append({'fileKey': val})
+                                sub_dict[sub_key] = {
+                                    'value': fileKeys
                                 }
                             else:
                                 sub_dict[sub_key] = {
@@ -300,6 +367,14 @@ class Kintone:
                     'value': codes
                 }
                 continue
+            elif parameter[key]['type'] == 'FILE':
+                fileKeys = []
+                for val in value:
+                    fileKeys.append({'fileKey': val})
+                params['record'][key] = {
+                    'value': fileKeys
+                }
+                continue
             elif parameter[key]['type'] == 'SUBTABLE':
                 params['record'][key] = {
                     'value': []
@@ -313,6 +388,13 @@ class Kintone:
                                 codes.append({'code': val})
                             sub_dict[sub_key] = {
                                 'value': codes
+                            }
+                        elif parameter[key]['fields'][sub_key]['type'] == 'FILE':
+                            fileKeys = []
+                            for val in sub_value:
+                                fileKeys.append({'fileKey': val})
+                            sub_dict[sub_key] = {
+                                'value': fileKeys
                             }
                         else:
                             sub_dict[sub_key] = {
@@ -358,11 +440,13 @@ class Kintone:
         tmp_param = {}
         url       = self.rootURL + 'records.json'
         parameter = self.property
+        resp      = []
 
         for record in records:
             #100件づつKintoneに登録する
             if len(params['records']) == 100:
                 resp = self.requestKintone(method='PUT', url=url, json=params)
+                params['records'] = []
             tmp_param['record'] = {}
             for key, value in record.items():
                 if key == '$revision':
@@ -385,6 +469,14 @@ class Kintone:
                         'value': codes
                     }
                     continue
+                elif parameter[key]['type'] == 'FILE':
+                    fileKeys = []
+                    for val in value:
+                        fileKeys.append({'fileKey': val})
+                    tmp_param['record'][key] = {
+                        'value': fileKeys
+                    }
+                    continue
                 elif parameter[key]['type'] == 'SUBTABLE':
                     tmp_param['record'][key] = {
                         'value': []
@@ -402,6 +494,13 @@ class Kintone:
                                     codes.append({'code': val})
                                 sub_dict[sub_key] = {
                                     'value': codes
+                                }
+                            elif parameter[key]['fields'][sub_key]['type'] == 'FILE':
+                                fileKeys = []
+                                for val in sub_value:
+                                    fileKeys.append({'fileKey': val})
+                                sub_dict[sub_key] = {
+                                    'value': fileKeys
                                 }
                             else:
                                 sub_dict[sub_key] = {
@@ -476,6 +575,14 @@ class Kintone:
                     'value': codes
                 }
                 continue
+            elif parameter[key]['type'] == 'FILE':
+                fileKeys = []
+                for val in value:
+                    fileKeys.append({'fileKey': val})
+                params['record'][key] = {
+                    'value': fileKeys
+                }
+                continue
             elif parameter[key]['type'] == 'SUBTABLE':
                 params['record'][key] = {
                     'value': []
@@ -493,6 +600,13 @@ class Kintone:
                                 codes.append({'code': val})
                             sub_dict[sub_key] = {
                                 'value': codes
+                            }
+                        elif parameter[key]['fields'][sub_key]['type'] == 'FILE':
+                            fileKeys = []
+                            for val in sub_value:
+                                fileKeys.append({'fileKey': val})
+                            sub_dict[sub_key] = {
+                                'value': fileKeys
                             }
                         else:
                             sub_dict[sub_key] = {
@@ -555,7 +669,7 @@ class Kintone:
 
     def postComment(self, recordID, text:str, mentions=None):
         """
-        docstring
+        postComment is function for posting comments to kintone.
         """
         if type(text) != str:
             raise Exception('Argument is not a str')
@@ -578,7 +692,7 @@ class Kintone:
 
     def deleteComment(self, recordID, commentID):
         """
-        docstring
+        deleteComment is function to delete the comment of kintone.
         """
 
         params = {
@@ -594,7 +708,7 @@ class Kintone:
 
     def selectComment(self, recordID, order=None, offset=None, limit=None):
         """
-        docstring
+        selectComment function to get the comments of kintone records at once.
         """
 
         params = {
